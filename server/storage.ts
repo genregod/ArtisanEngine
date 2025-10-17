@@ -3,7 +3,7 @@ import { eq, desc, and, gte, lte } from "drizzle-orm";
 import {
   users, releases, campaigns, contentCalendar, socialPosts,
   templates, assets, analytics, playlistPitches, abTests,
-  type User, type InsertUser,
+  type User, type InsertUser, type UpsertUser,
   type Release, type InsertRelease,
   type Campaign, type InsertCampaign,
   type ContentCalendar, type InsertContentCalendar,
@@ -21,6 +21,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByReplitId(replitId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
 
   // Releases
   getReleases(userId: number): Promise<Release[]>;
@@ -102,6 +103,24 @@ export class DbStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const result = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.replitId,
+        set: {
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
     return result[0];
   }
 

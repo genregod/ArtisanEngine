@@ -1,12 +1,28 @@
-import { pgTable, text, integer, serial, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, timestamp, boolean, jsonb, varchar, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").unique().notNull(),
+  username: text("username").unique(),
   email: text("email").unique(),
   replitId: text("replit_id").unique(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  profileImageUrl: text("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const releases = pgTable("releases", {
@@ -135,7 +151,8 @@ export const abTests = pgTable("ab_tests", {
 });
 
 // Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
+export const upsertUserSchema = createInsertSchema(users).omit({ id: true, username: true, createdAt: true, updatedAt: true });
 export const insertReleaseSchema = createInsertSchema(releases).omit({ id: true, createdAt: true });
 export const insertCampaignSchema = createInsertSchema(campaigns).omit({ id: true, createdAt: true });
 export const insertContentCalendarSchema = createInsertSchema(contentCalendar).omit({ id: true, createdAt: true });
@@ -149,6 +166,7 @@ export const insertABTestSchema = createInsertSchema(abTests).omit({ id: true, c
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type Release = typeof releases.$inferSelect;
 export type InsertRelease = z.infer<typeof insertReleaseSchema>;
 export type Campaign = typeof campaigns.$inferSelect;

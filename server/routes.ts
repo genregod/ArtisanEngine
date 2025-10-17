@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import {
   insertReleaseSchema, insertCampaignSchema, insertContentCalendarSchema,
   insertSocialPostSchema, insertTemplateSchema, insertAssetSchema,
@@ -12,18 +13,36 @@ import OpenAI from "openai";
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Middleware to get user from session (will be set by auth)
-  const requireUser = (req: Request, res: Response, next: Function) => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
+  // Setup Replit Auth
+  await setupAuth(app);
+
+  // Middleware to attach database user to request
+  const attachUser = async (req: any, res: Response, next: Function) => {
+    try {
+      const replitId = req.user.claims.sub;
+      const user = await storage.getUserByReplitId(replitId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      req.dbUser = user;
+      next();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
-    next();
   };
 
+  // Auth endpoint to get current user
+  app.get('/api/auth/user', isAuthenticated, attachUser, async (req: any, res) => {
+    res.json(req.dbUser);
+  });
+
+  // Helper to get user from request
+  const requireUser = [isAuthenticated, attachUser];
+
   // ===== RELEASES =====
-  app.get("/api/releases", requireUser, async (req: Request, res: Response) => {
+  app.get("/api/releases", requireUser, async (req: any, res: Response) => {
     try {
-      const releases = await storage.getReleases(req.user.id);
+      const releases = await storage.getReleases(req.dbUser.id);
       res.json(releases);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -40,9 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/releases", requireUser, async (req: Request, res: Response) => {
+  app.post("/api/releases", requireUser, async (req: any, res: Response) => {
     try {
-      const data = insertReleaseSchema.parse({ ...req.body, userId: req.user.id });
+      const data = insertReleaseSchema.parse({ ...req.body, userId: req.dbUser.id });
       const release = await storage.createRelease(data);
       res.status(201).json(release);
     } catch (error: any) {
@@ -230,19 +249,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== ASSETS =====
-  app.get("/api/assets", requireUser, async (req: Request, res: Response) => {
+  app.get("/api/assets", requireUser, async (req: any, res: Response) => {
     try {
       const releaseId = req.query.releaseId ? parseInt(req.query.releaseId as string) : undefined;
-      const assets = await storage.getAssets(req.user.id, releaseId);
+      const assets = await storage.getAssets(req.dbUser.id, releaseId);
       res.json(assets);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post("/api/assets", requireUser, async (req: Request, res: Response) => {
+  app.post("/api/assets", requireUser, async (req: any, res: Response) => {
     try {
-      const data = insertAssetSchema.parse({ ...req.body, userId: req.user.id });
+      const data = insertAssetSchema.parse({ ...req.body, userId: req.dbUser.id });
       const asset = await storage.createAsset(data);
       res.status(201).json(asset);
     } catch (error: any) {
