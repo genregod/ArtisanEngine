@@ -33,7 +33,7 @@ function Router() {
   );
 }
 
-function App() {
+function AppContent() {
   const { isAuthenticated } = useAuth();
   
   const sidebarStyle = {
@@ -42,27 +42,33 @@ function App() {
   } as React.CSSProperties;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        {isAuthenticated ? (
-          <SidebarProvider style={sidebarStyle}>
-            <div className="flex h-screen w-full">
-              <AppSidebar />
-              <div className="flex flex-col flex-1 overflow-hidden">
-                <header className="flex items-center justify-between p-4 border-b">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
-                </header>
-                <main className="flex-1 overflow-auto">
-                  <Router />
-                </main>
-              </div>
+    <TooltipProvider>
+      {isAuthenticated ? (
+        <SidebarProvider style={sidebarStyle}>
+          <div className="flex h-screen w-full">
+            <AppSidebar />
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <header className="flex items-center justify-between p-4 border-b">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+              </header>
+              <main className="flex-1 overflow-auto">
+                <Router />
+              </main>
             </div>
-          </SidebarProvider>
-        ) : (
-          <Router />
-        )}
-        <Toaster />
-      </TooltipProvider>
+          </div>
+        </SidebarProvider>
+      ) : (
+        <Router />
+      )}
+      <Toaster />
+    </TooltipProvider>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
     </QueryClientProvider>
   );
 }
